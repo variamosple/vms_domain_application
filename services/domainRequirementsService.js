@@ -62,11 +62,9 @@ async function generateFeaturesModel(req) {
         featureModel.elements.push(rootFeature);
     }
 
-    let graphSecret=new GraphSecret(secretGraph); 
-    let graph = graphSecret.graph;
-    //showPaths(graph);
+    let graphSecret=new GraphSecret(secretGraph);  
     fx += (fw + fdx)
-    let requirements = getRequirements(graph, domainRequirementsModel, requirementsOfAttributes);
+    let requirements = getRequirements(graphSecret, domainRequirementsModel, requirementsOfAttributes);
     createFeatures(domainRequirementsModel, featureModel, requirements, dicRequirementFeature, fx, fy, fw, fh, fdx, fdy);
     createConstraints(domainRequirementsModel, featureModel, requirements, dicRequirementFeature);
 
@@ -105,14 +103,15 @@ function getValueFromPart(parts, indexes) {
     return null;
 }
 
-function getRequirements(graph, domainRequirementsModel) {
+function getRequirements(graphSecret, domainRequirementsModel) {
+    let graph = graphSecret.graph;
     let initialNodes = graph.findInitialNodes();
     let ret = [];
     for (let m = 0; m < domainRequirementsModel.elements.length; m++) {
         let element = domainRequirementsModel.elements[m];
         if (element.type == "FunctionalRequirement") {
             let description = projectUtils.findElementProperty(element, "Description").value;
-            let parts = getSecretParts(graph, initialNodes, description);
+            let parts = graphSecret.getSecretParts(initialNodes, description);
             let item = {
                 element: element,
                 description: description,
@@ -341,275 +340,7 @@ function getFeatureByName(name, dicRequirementFeature) {
     return null;
 }
 
-function getSecretParts(graph, initialNodes, description) {
-    if (description.includes("choose")) {
-        let jjj = 0;
-    }
-    let words = NormalizeWords(description);
-    let coincidentPaths = [];
-    for (let i = 0; i < initialNodes.length; i++) {
-        const initialNode = initialNodes[i];
-        let token = getTokenFromNode(initialNode);
-        if (token == words[0]) {
-            const paths = graph.findAllPaths(initialNode);
-            for (let p = 0; p < paths.length; p++) {
-                console.log(p);
-                if (p == 66) {
-                    let x = 0;
-                }
-                const path = paths[p];
-                let candidateParts = checkPath(path, words);
-                if (candidateParts != null) {
-                    coincidentPaths.push(candidateParts);
-                }
-            }
-        }
-    }
-    if (coincidentPaths.length > 0) {
-        let p = 0;
-        let maxL = 0;
-        for (let c = 0; c < coincidentPaths.length; c++) {
-            const coincidentPath = coincidentPaths[c];
-            let l = countElements(coincidentPath);
-            if (maxL < l) {
-                maxL = l;
-                p = c;
-            }
-        }
-        return coincidentPaths[p];
-    }
-    return null;
-}
 
-function countElements(obj) {
-    let count = 0;
-    for (let key in obj) {
-        if (obj.hasOwnProperty(key)) {
-            count++;
-        }
-    }
-    return count;
-}
-
-
-function checkPath(path, words) {
-    showPath(path);
-    let tokenCount = 0;
-    for (let t = 0; t < path.length; t++) {
-        index = path[t];
-        token = getTokenFromNode(index);
-        if (token != "//") {
-            tokenCount++;
-        }
-    }
-    let tokenCoincidences = [];
-    let parts = null;
-    let candidateParts = [];
-    let w = 0;
-    let wildCard = -1;
-    let t = 0;
-    for (let w = 0; w < words.length; w++) {
-        const word = words[w];
-        let index = null;
-        let token = null;
-        let tag = null;
-        while (true) {
-            index = path[t];
-            tag = getTagFromNode(index);
-            token = getTokenFromNode(index);
-            if (token != "//") {
-                break;
-            } else {
-                if (!tokenCoincidences.includes(index)) {
-                    tokenCoincidences.push(index);
-                }
-            }
-            if (t < path.length - 1) {
-                t++;
-            } else {
-                if (t == wildCard) {
-                    return null;
-                }
-            }
-        }
-
-        if (token == word) {
-            let item = {
-                word: word,
-                key: token,
-                tag: tag + '_' + token,
-                id: index
-            }
-            candidateParts['_' + index] = item;
-            wildCard = -1;
-            if (!tokenCoincidences.includes(index)) {
-                tokenCoincidences.push(index);
-            }
-            t++;
-        } else {
-            if (token.startsWith(wildCardStart)) {
-                if (!candidateParts['_' + index]) {
-                    let item = {
-                        word: word,
-                        key: token,
-                        tag: tag + '_' + token,
-                        id: index
-                    }
-                    candidateParts['_' + index] = item;
-                } else {
-                    candidateParts['_' + index].word = candidateParts['_' + index].word + ' ' + word;
-                }
-                wildCard = t;
-                if (!tokenCoincidences.includes(index)) {
-                    tokenCoincidences.push(index);
-                }
-                t++;
-            }
-            else {
-                if (wildCard > -1) {
-                    t = wildCard;
-                    wildCard = -1;
-                    w--;
-                } else {
-                    // t++;
-                    return null;
-                }
-            }
-        }
-        if (w == words.length - 1) {
-            if (path.length == tokenCoincidences.length) {
-                for (let t = 0; t < path.length; t++) {
-                    if (path[t] != tokenCoincidences[t]) {
-                        return null;
-                    }
-                }
-                return candidateParts;
-            }
-        }
-    }
-    return null;
-}
-
-function getSecretParts2(graph, initialNodes, description) {
-    let parts = null;
-    let tokens = tokenize(description);
-    for (let i = 0; i < initialNodes.length; i++) {
-        const initialNode = initialNodes[i];
-        let word = getWordFromNode(initialNode);
-        if (word == tokens[0]) {
-            const paths = graph.findAllPaths(initialNode);
-            let candidateParts = [];
-            for (let p = 0; p < paths.length; p++) {
-                console.log(p);
-                const path = paths[p];
-                if (p == 66) {
-                    let x = 0;
-                }
-                let w = 0;
-                for (let t = 0; t < tokens.length; t++) {
-                    let token = tokens[t];
-                    if (w >= path.length) {
-                        break;
-                    }
-                    let index = path[w];
-                    word = getWordFromNode(index);
-                    if (word == "//") {
-                        w++;
-                        if (w >= path.length) {
-                            break;
-                        }
-                        index = path[w];
-                        word = getWordFromNode(index);
-                    }
-                    w++;
-                    if (token == word) {
-                        let item = {
-                            word: token,
-                            key: word,
-                            id: index
-                        }
-                        if (token == "provide" && word == "provide") {
-                            token = "provide";
-                        }
-                        candidateParts['_' + index] = item;
-                        if (t == tokens.length - 1) {
-                            parts = candidateParts;
-                            break;
-                        }
-                    } else {
-                        if (word.startsWith(wildCardStart)) {
-                            let item = {
-                                word: token,
-                                key: word,
-                                id: index
-                            }
-                            if (token == "provide" && word == "provide") {
-                                token = "provide";
-                            }
-                            candidateParts['_' + index] = item;
-                            if (t == tokens.length - 1) {
-                                parts = candidateParts;
-                                break;
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-                }
-                if (parts) {
-                    break;
-                }
-            }
-        }
-    }
-
-    return parts;
-}
-
-function getTokenFromNode(id) {
-    let word = secretGraph.nodes[id].name;
-    return word;
-}
-
-function getTagFromNode(id) {
-    let tag = secretGraph.nodes[id].tag;
-    return tag;
-}
-
-function NormalizeWords(text) {
-    let str = text.toLowerCase();
-    if (!str.endsWith(".")) {
-        str += ".";
-    }
-    str = str.replace(/\./g, ' . ');
-    str = str.replace(/\(/g, ' ( ');
-    str = str.replace(/\)/g, ' ) ');
-    str = str.replace(/\r/g, '');
-    str = str.replace(/\n/g, '');
-    str = str.trim();
-    while (str.includes('  ')) {
-        str = replaceDoubleSpacesWithSingle(str);
-    }
-
-    let tokens = str.split(' ');
-    return tokens;
-}
-
-function replaceDoubleSpacesWithSingle(inputString) {
-    return inputString.replace(/ {2}/g, ' ');
-} 
-
-function showPath(path) {
-    let words = [];
-    for (let j = 0; j < path.length; j++) {
-        const id = path[j];
-        let name = secretGraph.nodes[id].name;
-        if (name != "//") {
-            words.push(name);
-        }
-    }
-    console.log(words.join(' '));
-}
 
 
 
