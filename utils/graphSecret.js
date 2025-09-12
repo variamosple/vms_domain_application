@@ -1,18 +1,22 @@
 const { Graph } = require("./graph");
 
-class GraphSecretUtils {
+class GraphSecret  {
+    constructor(secretGraph) {
+        this.secretGraph=secretGraph;
+        this.graph=this.loadGraph();
+    }
 
-  static loadGraph(secretGraph) {
+   loadGraph() {
     let graph = new Graph();
     if (true) {
       let dic = [];
-      for (let i = 0; i < secretGraph.nodes.length; i++) {
-        const node = secretGraph.nodes[i];
+      for (let i = 0; i < this.secretGraph.nodes.length; i++) {
+        const node = this.secretGraph.nodes[i];
         graph.addVertex(i);
         dic[node.id] = i;
       }
-      for (let i = 0; i < secretGraph.edges.length; i++) {
-        const edge = secretGraph.edges[i];
+      for (let i = 0; i < this.secretGraph.edges.length; i++) {
+        const edge = this.secretGraph.edges[i];
         let sourceId = dic[edge.sourceNodeId];
         let targetId = dic[edge.targetNodeId];
         graph.addEdge(sourceId, targetId);
@@ -50,4 +54,4 @@ class GraphSecretUtils {
 }
 
 //export methods
-module.exports = { GraphSecretUtils };
+module.exports = { GraphSecret };

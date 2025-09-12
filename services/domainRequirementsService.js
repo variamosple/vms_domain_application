@@ -6,7 +6,7 @@ var textUtils = require('../utils/textUtils');
 var secretGraph = require('./secretGraph.json');
 var { Graph } = require('../utils/graph.js');
 const { positiveUniversalMeasureValue } = require('docx');
-const { GraphSecretUtils } = require('../utils/graphSecretUtils.js');
+const { GraphSecretUtils, GraphSecret } = require('../utils/graphSecret.js');
 
 const wildCardStart = '[';
 const wildCardEnd = ']';
@@ -62,8 +62,8 @@ async function generateFeaturesModel(req) {
         featureModel.elements.push(rootFeature);
     }
 
-
-    let graph = GraphSecretUtils.loadGraph(secretGraph);
+    let graphSecret=new GraphSecret(secretGraph); 
+    let graph = graphSecret.graph;
     //showPaths(graph);
     fx += (fw + fdx)
     let requirements = getRequirements(graph, domainRequirementsModel, requirementsOfAttributes);
