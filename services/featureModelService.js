@@ -17,7 +17,7 @@ function organize(featureModel) {
 function organizeFeature(featureModel, feature, px, py) {
     let me = this;
     let dx = 150;
-    let dy = 150;
+    let dy = 100;
     let pxRet=px;
     feature.x=px;
     feature.y=py;

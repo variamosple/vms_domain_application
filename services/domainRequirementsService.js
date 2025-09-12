@@ -6,6 +6,7 @@ var textUtils = require('../utils/textUtils');
 var secretGraph = require('./secretGraph.json');
 var { Graph } = require('../utils/graph.js');
 const { positiveUniversalMeasureValue } = require('docx');
+const { GraphSecretUtils } = require('../utils/graphSecretUtils.js');
 
 const wildCardStart = '[';
 const wildCardEnd = ']';
@@ -62,7 +63,7 @@ async function generateFeaturesModel(req) {
     }
 
 
-    let graph = loadGraph();
+    let graph = GraphSecretUtils.loadGraph(secretGraph);
     //showPaths(graph);
     fx += (fw + fdx)
     let requirements = getRequirements(graph, domainRequirementsModel, requirementsOfAttributes);
@@ -176,20 +177,21 @@ function generateName(secret) {
 
 function createConstraints(domainRequirementsModel, featuresModel, requirements, dicRequirementFeature) {
     let rootFeature = featuresModel.elements[0];
+    let processedRequirements=[];
+ 
+    //Create bundles
     for (var key in requirements) {
         if (requirements.hasOwnProperty(key)) {
-            let requirement = requirements[key];
-            if (requirement.description.includes("font color")) {
-                let jjj = 0;
-            }
+            let requirement = requirements[key]; 
             let secret = requirement.secret;
             if (secret) {
                 let parentFeature = rootFeature;
                 if (containsAllFromPart(secret, ["1c_in"])) {
                     if (containsAllFromPart(secret, ["6e_between"])) {
-                        if (!containsAllFromPart(secret, ["8_[additional object details]"])) {
+                        // if (!containsAllFromPart(secret, ["8_[additional object details]"])) {
                             let name = generateName(secret); 
                             if (name) {
+                                //create bundle
                                 let minValue = parseInt(getValueFromPart(secret, ["6e_[a]"]));
                                 let maxValue = parseInt(getValueFromPart(secret, ["6e_[b]"]));
                                 let bundle = featuresModelUtils.createBundle(name, minValue, maxValue, 200, 100, 100, 50);
@@ -202,9 +204,33 @@ function createConstraints(domainRequirementsModel, featuresModel, requirements,
                                 let type = parentFeature.type + "_Bundle";
                                 let relationship = featuresModelUtils.createRelationship(parentFeature, bundle, type);
                                 featuresModel.relationships.push(relationship);
+
+                                processedRequirements.push(key);
                             }
-                        }
-                        else {
+                        // } 
+                    } 
+                } 
+            }
+        }
+    }
+
+
+    for (var key in requirements) {
+        if (requirements.hasOwnProperty(key)) {
+            if (processedRequirements.includes(key)) {
+                continue;
+            }
+            let requirement = requirements[key];
+            if (requirement.description.includes("font color")) {
+                let jjj = 0;
+            }
+            let secret = requirement.secret;
+            if (secret) {
+                let parentFeature = rootFeature;
+                if (containsAllFromPart(secret, ["1c_in"])) {
+                    if (containsAllFromPart(secret, ["6e_between"])) {
+                        if (containsAllFromPart(secret, ["8_[additional object details]"])) {
+                            //create attribute in feature
                             let valueFeatureIncluded = getValueFromPart(secret, ["1c_[included feature]"]);
                             let propertyName = getValueFromPart(secret, ["6_[object/asset]"])
                             let strOptions = getValueFromPart(secret, ["8_[additional object details]"]);
@@ -219,6 +245,7 @@ function createConstraints(domainRequirementsModel, featuresModel, requirements,
                         continue;
                     }
                     else {
+                        //obtener caracteristica padre
                         let sourceRequirementId = requirement.element.id;
                         let refinedRequirements = domainRequirementsModelUtils.findTargetRequirements(domainRequirementsModel, sourceRequirementId, "FunctionalRequirement_FunctionalRequirement", "Refinement")
                         if (refinedRequirements.length == 0) {
@@ -247,10 +274,12 @@ function createConstraints(domainRequirementsModel, featuresModel, requirements,
                     let type = "Bundle_Feature";
                     let feature = dicRequirementFeature[key];
                     if (feature) {
+                        //crear relacion bundle - feature
                         let relationship = featuresModelUtils.createRelationship(parentFeature, feature, type);
                         featuresModel.relationships.push(relationship);
                     }
                 } else {
+                    //crear relacion feature - feature
                     let type = null;
                     let value = getValueFromPart(secret, ["2_all"]);
                     if (value) {
@@ -269,6 +298,7 @@ function createConstraints(domainRequirementsModel, featuresModel, requirements,
                 }
 
                 if (true) {
+                        //crear relaciones includes y excludes
                     let feature = dicRequirementFeature[key];
                     if (feature) {
                         let sourceRequirementId = requirement.element.id;
@@ -297,6 +327,8 @@ function createConstraints(domainRequirementsModel, featuresModel, requirements,
             }
         }
     }
+
+    
 }
 
 function getFeatureByName(name, dicRequirementFeature) {
@@ -565,53 +597,7 @@ function NormalizeWords(text) {
 
 function replaceDoubleSpacesWithSingle(inputString) {
     return inputString.replace(/ {2}/g, ' ');
-}
-
-function loadGraph() {
-    let graph = new Graph();
-    if (true) {
-        let dic = [];
-        for (let i = 0; i < secretGraph.nodes.length; i++) {
-            const node = secretGraph.nodes[i];
-            graph.addVertex(i);
-            dic[node.id] = i;
-        }
-        for (let i = 0; i < secretGraph.edges.length; i++) {
-            const edge = secretGraph.edges[i];
-            let sourceId = dic[edge.sourceNodeId];
-            let targetId = dic[edge.targetNodeId];
-            graph.addEdge(sourceId, targetId);
-        }
-    } else {
-        graph.addVertex('A');
-        graph.addVertex('B');
-        graph.addVertex('C');
-        graph.addVertex('D');
-
-        graph.addEdge('A', 'B');
-        graph.addEdge('A', 'C');
-        graph.addEdge('B', 'D');
-        graph.addEdge('C', 'D');
-    }
-    return graph;
-}
-
-function showPaths(graph) {
-    const startNode = 0;
-    const paths = graph.findAllPaths(startNode);
-    for (let i = 0; i < paths.length; i++) {
-        const path = paths[i];
-        let words = [];
-        for (let j = 0; j < path.length; j++) {
-            const id = path[j];
-            let name = secretGraph.nodes[id].name;
-            if (name != "//") {
-                words.push(name);
-            }
-        }
-        console.log(words.join(' '));
-    }
-}
+} 
 
 function showPath(path) {
     let words = [];
