@@ -3,6 +3,7 @@ var express = require('express');
 var cors = require('cors');
 
 var domainRequirementsService = require('./services/domainRequirementsService');
+var featureModelService = require('./services/featureModelService.js');
 var mapModelService = require('./services/mapModelService');
 var graphModelService = require('./services/graphModelService');
 var serenaTransfrmations = require('./services/serenaTransformations.js');
@@ -55,6 +56,25 @@ app.post('/generateFeaturesModelFromDomainRequirements', async function (req, re
         console.log(req.body.data)
         res.setHeader('Content-Type', 'application/json');
         let project = await domainRequirementsService.generateFeaturesModel(req);
+        console.log(project);
+        let contentResponse = {
+            transactionId: "1",
+            message: "Completed.",
+            data: {
+                content: project
+            }
+        }
+        res.end(JSON.stringify(contentResponse));
+    } catch (error) {
+        res.status(400).send(JSON.stringify(error));
+    }
+});
+
+app.post('/organizeFeatureModel', async function (req, res, next) {
+    try {
+        console.log(req.body.data)
+        res.setHeader('Content-Type', 'application/json');
+        let project = featureModelService.organizeFeatureModel(req);
         console.log(project);
         let contentResponse = {
             transactionId: "1",

@@ -24,6 +24,37 @@ function createConcreteFeature(name, x, y, w, h) {
     return feature;
 }
 
+function createMLBasedFeature(name, x, y, w, h) {
+    let feature = createFeature("MLBasedFeature", name, x, y, w, h);
+    feature.properties.push(
+        {
+            "id": generateUUID(),
+            "name": "Accuracy_range",
+            "value": "Undefined",
+            "type": "Text",
+            "custom": false,
+            "display": true
+        },
+        {
+            "id": generateUUID(),
+            "name": "Context_sensitivity",
+            "value": "Undefined",
+            "type": "Text",
+            "custom": false,
+            "display": true
+        },
+        {
+            "id": generateUUID(),
+            "name": "Confidence_intervals",
+            "value": "Undefined",
+            "type": "Text",
+            "custom": false,
+            "display": true
+        }
+    )
+    return feature;
+}
+
 function createBundle(name, minValue, maxValue, x, y, w, h) {
     let bundle = {
         "id": generateUUID(),
@@ -94,7 +125,7 @@ function createFeature(type, name, x, y, w, h) {
         ]
     }
     return feature;
-} 
+}
 
 function createRelationshipFeature_Feature(source, target, type) {
     let relationship = {
@@ -136,8 +167,8 @@ function createRelationship(source, target, type) {
     return relationship;
 }
 
-function createProperty(name, type, value, possibleValues, constraint){
-  let property=  {
+function createProperty(name, type, value, possibleValues, constraint) {
+    let property = {
         "id": generateUUID(),
         "name": name,
         "type": type,
@@ -176,6 +207,6 @@ function generateUUID() {
 
 //export methods
 module.exports = {
-    createFeatureModel, createRootFeature, createAbstractFeature, createConcreteFeature, createBundle, createProperty,
+    createFeatureModel, createRootFeature, createAbstractFeature, createConcreteFeature, createMLBasedFeature, createBundle, createProperty,
     createRelationshipFeature_Feature, createRelationship
 };

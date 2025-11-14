@@ -3,7 +3,8 @@ var featuresModelUtils = require('../utils/featuresModelUtils');
 var domainRequirementsModelUtils = require('../utils/domainRequirementsModelUtils.js');
 var featuresModelService = require('./featureModelService.js');
 var textUtils = require('../utils/textUtils');
-var secretGraph = require('./secretGraph.json');
+var functionalRequirementsGraph = require('./secretGraph.json');
+var nonFunctionalRequirementsGraph = require('./secretGraphNFR.json');
 var { Graph } = require('../utils/graph.js');
 const { positiveUniversalMeasureValue } = require('docx');
 const { GraphSecretUtils, GraphSecret } = require('../utils/graphSecret.js');
@@ -20,7 +21,7 @@ async function generateFeaturesModel(req) {
     }
 
     let fw = 100;
-    let fh = 66;
+    let fh = 75;
     let fx = 100;
     let fy = 100;
     let fdx = 25;
@@ -62,11 +63,13 @@ async function generateFeaturesModel(req) {
         featureModel.elements.push(rootFeature);
     }
 
-    let graphSecret=new GraphSecret(secretGraph);  
+    let graphSecretFR = new GraphSecret(functionalRequirementsGraph);
+    let graphSecretNFR = new GraphSecret(nonFunctionalRequirementsGraph);
     fx += (fw + fdx)
-    let requirements = getRequirements(graphSecret, domainRequirementsModel, requirementsOfAttributes);
-    createFeatures(domainRequirementsModel, featureModel, requirements, dicRequirementFeature, fx, fy, fw, fh, fdx, fdy);
-    createConstraints(domainRequirementsModel, featureModel, requirements, dicRequirementFeature);
+    let functionalRequirements = getRequirements(graphSecretFR, domainRequirementsModel, requirementsOfAttributes);
+    let nonFunctionalRequirements = getNonFunctionalRequirements(graphSecretNFR, domainRequirementsModel, requirementsOfAttributes);
+    createFeatures(domainRequirementsModel, featureModel, functionalRequirements, nonFunctionalRequirements, dicRequirementFeature, fx, fy, fw, fh, fdx, fdy);
+    createConstraints(domainRequirementsModel, featureModel, functionalRequirements, dicRequirementFeature);
 
     featuresModelService.organize(featureModel);
 
@@ -123,7 +126,28 @@ function getRequirements(graphSecret, domainRequirementsModel) {
     return ret;
 }
 
-function createFeatures(domainRequirementsModel, featuresModel, requirements, dicRequirementFeature, px, py, pw, ph, pdx, pdy) {
+function getNonFunctionalRequirements(graphSecret, domainRequirementsModel) {
+    let graph = graphSecret.graph;
+    let initialNodes = graph.findInitialNodes();
+    let ret = [];
+    for (let m = 0; m < domainRequirementsModel.elements.length; m++) {
+        let element = domainRequirementsModel.elements[m];
+        if (element.type == "NonFunctionalRequirement") {
+            let description = projectUtils.findElementProperty(element, "Description").value;
+            let parts = graphSecret.getSecretParts(initialNodes, description);
+            let item = {
+                element: element,
+                description: description,
+                secret: parts
+            }
+            ret[element.id] = item;
+        }
+    }
+    return ret;
+}
+
+function createFeatures(domainRequirementsModel, featuresModel, requirements, nonFunctionalRequirements, dicRequirementFeature, px, py, pw, ph, pdx, pdy) {
+    let machineLearningRequirements = getMachineLearningRequirements(nonFunctionalRequirements);
     let pi = 0
     for (var key in requirements) {
         if (requirements.hasOwnProperty(key)) {
@@ -136,17 +160,70 @@ function createFeatures(domainRequirementsModel, featuresModel, requirements, di
                 if (containsAllFromPart(secret, ["1c_in", "6e_between"])) {
                     continue;
                 }
-                let name = generateName(secret); 
+                let name = generateName(secret);
                 if (name) {
-                    //let feature = featuresModelUtils.createConcreteFeature(name, (pi * (pw + pdx)) + pdx, py + ph + pdy, pw, ph);
-                    let feature = featuresModelUtils.createConcreteFeature(name, px + (pi * (pw + pdx)) + pdx, py, pw, ph);
-                    featuresModel.elements.push(feature);
+                    let feature = null;
+                    if (machineLearningRequirements.hasOwnProperty(name)) {
+                        let isOptional = machineLearningRequirements[name];
+                        if (isOptional) {
+                            feature = featuresModelUtils.createAbstractFeature(name, px + (pi * (pw + pdx)) + pdx, py, pw * 2, ph);
+                            feature.isML = true;
+                            featuresModel.elements.push(feature);
+                            //create bundle
+                            let minValue = 1;
+                            let maxValue = 2;
+                            let bundle = featuresModelUtils.createBundle(name, minValue, maxValue, 200, 100, 100, 50);
+                            featuresModel.elements.push(bundle);
+                            parentFeature = feature;
+                            let type = parentFeature.type + "_Bundle";
+                            let relationship = featuresModelUtils.createRelationship(parentFeature, bundle, type);
+                            featuresModel.relationships.push(relationship);
+
+                            let concretefeature = featuresModelUtils.createConcreteFeature(name, px + (pi * (pw + pdx)) + pdx, py, pw, ph);
+                            featuresModel.elements.push(concretefeature);
+                            type = "Bundle_Feature";
+                            relationship = featuresModelUtils.createRelationship(bundle, concretefeature, type);
+                            featuresModel.relationships.push(relationship);
+                            concretefeature = featuresModelUtils.createMLBasedFeature(name, px + (pi * (pw + pdx)) + pdx, py, pw * 2, ph);
+                            featuresModel.elements.push(concretefeature);
+                            type = "Bundle_Feature";
+                            relationship = featuresModelUtils.createRelationship(bundle, concretefeature, type);
+                            featuresModel.relationships.push(relationship);
+                        } else {
+                            feature = featuresModelUtils.createMLBasedFeature(name, px + (pi * (pw + pdx)) + pdx, py, pw * 2, ph);
+                            featuresModel.elements.push(feature);
+                        }
+                    } else {
+                        feature = featuresModelUtils.createConcreteFeature(name, px + (pi * (pw + pdx)) + pdx, py, pw, ph);
+                        featuresModel.elements.push(feature);
+                    }
                     dicRequirementFeature[key] = feature;
                     pi++;
+
                 }
             }
         }
     }
+}
+
+function getMachineLearningRequirements(nonFunctionalRequirements) {
+    let ret = [];
+    for (var key in nonFunctionalRequirements) {
+        if (nonFunctionalRequirements.hasOwnProperty(key)) {
+            let requirement = nonFunctionalRequirements[key];
+            let secret = requirement.secret;
+            if (secret) {
+                if (containsAllFromPart(secret, ["2_it", "4d_implemented"])) {
+                    let valueFeatureIncluded = getValueFromPart(secret, ["1c_[included feature]"]);
+                    ret[valueFeatureIncluded] = true;
+                    if (containsAllFromPart(secret, ["3_shall"])) {
+                        ret[valueFeatureIncluded] = false;
+                    }
+                }
+            }
+        }
+    }
+    return ret;
 }
 
 function generateName(secret) {
@@ -176,39 +253,39 @@ function generateName(secret) {
 
 function createConstraints(domainRequirementsModel, featuresModel, requirements, dicRequirementFeature) {
     let rootFeature = featuresModel.elements[0];
-    let processedRequirements=[];
- 
+    let processedRequirements = [];
+
     //Create bundles
     for (var key in requirements) {
         if (requirements.hasOwnProperty(key)) {
-            let requirement = requirements[key]; 
+            let requirement = requirements[key];
             let secret = requirement.secret;
             if (secret) {
                 let parentFeature = rootFeature;
                 if (containsAllFromPart(secret, ["1c_in"])) {
                     if (containsAllFromPart(secret, ["6e_between"])) {
                         // if (!containsAllFromPart(secret, ["8_[additional object details]"])) {
-                            let name = generateName(secret); 
-                            if (name) {
-                                //create bundle
-                                let minValue = parseInt(getValueFromPart(secret, ["6e_[a]"]));
-                                let maxValue = parseInt(getValueFromPart(secret, ["6e_[b]"]));
-                                let bundle = featuresModelUtils.createBundle(name, minValue, maxValue, 200, 100, 100, 50);
-                                featuresModel.elements.push(bundle);
-                                dicRequirementFeature[key] = bundle;
+                        let name = generateName(secret);
+                        if (name) {
+                            //create bundle
+                            let minValue = parseInt(getValueFromPart(secret, ["6e_[a]"]));
+                            let maxValue = parseInt(getValueFromPart(secret, ["6e_[b]"]));
+                            let bundle = featuresModelUtils.createBundle(name, minValue, maxValue, 200, 100, 100, 50);
+                            featuresModel.elements.push(bundle);
+                            dicRequirementFeature[key] = bundle;
 
-                                let valueFeatureIncluded = getValueFromPart(secret, ["1c_[included feature]"]);
-                                parentFeature = getFeatureByName(valueFeatureIncluded, dicRequirementFeature);
+                            let valueFeatureIncluded = getValueFromPart(secret, ["1c_[included feature]"]);
+                            parentFeature = getFeatureByName(valueFeatureIncluded, dicRequirementFeature);
 
-                                let type = parentFeature.type + "_Bundle";
-                                let relationship = featuresModelUtils.createRelationship(parentFeature, bundle, type);
-                                featuresModel.relationships.push(relationship);
+                            let type = parentFeature.type + "_Bundle";
+                            let relationship = featuresModelUtils.createRelationship(parentFeature, bundle, type);
+                            featuresModel.relationships.push(relationship);
 
-                                processedRequirements.push(key);
-                            }
+                            processedRequirements.push(key);
+                        }
                         // } 
-                    } 
-                } 
+                    }
+                }
             }
         }
     }
@@ -297,7 +374,7 @@ function createConstraints(domainRequirementsModel, featuresModel, requirements,
                 }
 
                 if (true) {
-                        //crear relaciones includes y excludes
+                    //crear relaciones includes y excludes
                     let feature = dicRequirementFeature[key];
                     if (feature) {
                         let sourceRequirementId = requirement.element.id;
@@ -327,7 +404,7 @@ function createConstraints(domainRequirementsModel, featuresModel, requirements,
         }
     }
 
-    
+
 }
 
 function getFeatureByName(name, dicRequirementFeature) {
