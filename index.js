@@ -15,6 +15,7 @@ var additionalRequirements = require('./services/additionalRequirements');
 var relatedRequirementsService = require('./services/relatedRequirementsService');
 var relatedRequirementsApplicationService = require('./services/relatedRequirementsApplicationService');
 var generate = require('./services/generateSRS');
+var healthService = require('./services/healthService');
 
 var app = express(); 
 
@@ -24,6 +25,15 @@ app.use(express.urlencoded({limit: '50mb'}));
 
 
 app.use(cors());
+
+app.get('/health', function (req, res) {
+    try {
+        const health = healthService.getHealth();
+        res.status(200).json(health);
+    } catch (error) {
+        res.status(500).json({ status: "DOWN", error: error.message });
+    }
+});
 
 app.get('/', async function (req, res, next) {
     try {
