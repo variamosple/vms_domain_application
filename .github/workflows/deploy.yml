@@ -1,0 +1,18 @@
+# Builds, checks and deploys the service with the shared workflow of the
+# organization: https://github.com/variamosple/.github
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: variamosple/.github/.github/workflows/deploy.yml@v1
+    with:
+      image: vms_domain_application
+      service: vmsdomainapplicationaws
+      health-url: https://app.variamos.com/vms_domain_application/health
+      health-name: vms_domain_application
+    secrets: inherit
